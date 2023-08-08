@@ -32,13 +32,11 @@ def setup() -> None:
 
 
 def main() -> None:
-    setup()
-
     while True:
-        front_distance = ULTRASONIC_SENSORS[0]
-        back_distance  = ULTRASONIC_SENSORS[1]
-        right_distance = ULTRASONIC_SENSORS[2]
-        left_distance  = ULTRASONIC_SENSORS[3]
+        front_distance = ULTRASONIC_SENSORS[0].measure()
+        back_distance  = ULTRASONIC_SENSORS[1].measure()
+        right_distance = ULTRASONIC_SENSORS[2].measure()
+        left_distance  = ULTRASONIC_SENSORS[3].measure()
 
 
         if (front_distance < 50 or back_distance < 50):
@@ -69,6 +67,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
+        setup()
         main()
     except KeyboardInterrupt:
         GPIO.cleanup()
