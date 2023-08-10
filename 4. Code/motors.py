@@ -1,9 +1,8 @@
 import RPi.GPIO as GPIO
-from servo import Servo
 
 
 class DCMotor:
-    def __init__(self, PWM_pin: int, DIR_pin: int, frequency=1000) -> None:
+    def __init__(self, PWM_pin: int, DIR_pin: int, frequency=50) -> None:
         """Initialise a DC motor object.
         
         The MD10C motor driver gets 14.8V from the LiPo battery and outputs 12V to the DC motor.
@@ -20,13 +19,15 @@ class DCMotor:
             frequency (int, optional): The PWM frequency in Hertz. Defaults to 1000.
         """
         self.PWM_pin = PWM_pin
+        self.DIR_pin = DIR_pin
         self.frequency = frequency
 
-        self.DIR_pin = DIR_pin
         self.current_direction = GPIO.HIGH
+        GPIO.setup(self.DIR_pin, GPIO.OUT)
 
-        GPIO.setup(PWM_pin, GPIO.OUT)
+        GPIO.setup(self.PWM_pin, GPIO.OUT)
         self.motor = GPIO.PWM(PWM_pin, frequency)
+        self.motor.start(20)
 
     def __getattr__(self, attr):
         # Delegate unknown attributes to GPIO.PWM object
@@ -36,15 +37,26 @@ class DCMotor:
 
     def forward(self) -> None:
         self.current_direction = GPIO.HIGH
-        GPIO.setup(self.DIR_pin, self.current_direction)
+        GPIO.output(self.DIR_pin, self.current_direction)
 
     def backward(self) -> None:
         self.current_direction = GPIO.LOW
-        GPIO.setup(self.DIR_pin, self.current_direction)
+        GPIO.output(self.DIR_pin, self.current_direction)
 
     def reverse(self) -> None:
         self.current_direction = GPIO.LOW if self.current_direction == GPIO.HIGH else GPIO.HIGH
         GPIO.output(self.DIR_pin, self.current_direction)
 
 
-my_servo = Servo(pin_id=26)
+class Servo:
+    def __init__(self, PWM_pin: int, frequency=50) -> None:
+        self.PWM_pin = PWM_pin
+        self.angle = 0
+
+        GPIO.setup(self.PWM_pin, GPIO.OUT)
+        self.servo = GPIO.PWM(PWM_pin, frequency)
+        self.servo.start(60)
+
+    def rotate(self, angle: int) -> None:
+        difference = self.angle - angle
+        self.angle = angle
