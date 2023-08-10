@@ -28,27 +28,28 @@ class UltrasonicSensor:
         Returns:
             float: The calculated distance in centimetres.
         """
+        
+        def trigger():
+            # Trigger for 10 microseconds, should send 8 ultrasonic bursts at 40KHz
+            # Try 0.01 if this doesn't work, most OS support 10 ms at least
+            GPIO.output(self.trigger, GPIO.HIGH)
+            time.sleep(0.00001)
 
+            GPIO.output(self.trigger, GPIO.LOW)
+            
         # Set trigger pin to LOW for stabilisation. To lower the duration after testing
         GPIO.output(self.trigger, GPIO.LOW)
         time.sleep(0.2)
-
-        # Trigger for 10 microseconds, should send 8 ultrasonic bursts at 40KHz
-        # Try 0.01 if this doesn't work, most OS support 10 ms at least
-        GPIO.output(self.trigger, GPIO.HIGH)
-        time.sleep(0.00001)
-
-        GPIO.output(self.trigger, GPIO.LOW)
+        trigger()
 
         start_time = time.time()
         stop_time = time.time()
 
         while GPIO.input(self.echo) == 0:
-            print("Waiting for echo to go HIGH...")
+            trigger()
             start_time = time.time()
 
         while GPIO.input(self.echo) == 1:
-            print("Echo is HIGH, measuring...")
             stop_time = time.time()
 
         elapsed_time = stop_time - start_time
