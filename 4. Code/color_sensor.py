@@ -4,6 +4,8 @@ import math
 
 import RPi.GPIO as GPIO
 
+from utils import pulseIn
+
 
 # Helper functions
 def euclidean_distance(color1, color2):
@@ -29,7 +31,7 @@ COLOR_TOLERANCE = 0.1
 
 
 class ColorSensor:
-    def __init__(self, s2: int, s3: int, out: int) -> None:
+    def __init__(self, s0: int, s1: int, s2: int, s3: int, out: int) -> None:
         """Initialise a colour sensor object.
 
         The TCS3200 colour sensor module is used to calibrate direction and to calculate the angle from the difference of the two sensors.
@@ -46,9 +48,15 @@ class ColorSensor:
         self.s3 = s3
         self.out = out
 
-        GPIO.setup(s2, GPIO.IN)
-        GPIO.setup(s3, GPIO.IN)
-        GPIO.setup(out, GPIO.OUT)
+        # Frequency scaling pins (20%)
+        GPIO.setup(s0, GPIO.OUT)
+        GPIO.setup(s1, GPIO.OUT)
+        GPIO.output(s0, GPIO.HIGH)
+        GPIO.output(s1, GPIO.LOW)
+
+        GPIO.setup(s2, GPIO.OUT)
+        GPIO.setup(s3, GPIO.OUT)
+        GPIO.setup(out, GPIO.IN)
 
         # Sensor states
         self.time_since_color = None
@@ -62,19 +70,24 @@ class ColorSensor:
 
         GPIO.output(self.s2, GPIO.LOW)
         GPIO.output(self.s3, GPIO.LOW)
-        red = GPIO.input(self.out)
+        red = round(pulseIn(self.out, GPIO.HIGH) * 10e6)
 
         # Try 0.01 if this doesn't work, most OS support 10 ms at least
+        # In production see if 10 microseconds work (1e-5 s)
         time.sleep(0.001)
 
         GPIO.output(self.s2, GPIO.HIGH)
         GPIO.output(self.s3, GPIO.HIGH)
-        green = GPIO.input(self.out)
+        green = round(pulseIn(self.out, GPIO.HIGH) * 10e6)
         time.sleep(0.001)
 
         GPIO.output(self.s2, GPIO.LOW)
         GPIO.output(self.s3, GPIO.HIGH)
-        blue = GPIO.input(self.out)
+        blue = round(pulseIn(self.out, GPIO.HIGH) * 10e6)
+
+        # Try 0.01 if this doesn't work, most OS support 10 ms at least
+        time.sleep(0.1)
+
 
         return red, green, blue
 
