@@ -1,8 +1,9 @@
 import RPi.GPIO as GPIO
+import time
 
 
 class DCMotor:
-    def __init__(self, PWM_pin: int, DIR_pin: int, frequency=50) -> None:
+    def __init__(self, PWM_pin: int, DIR_pin: int, frequency: int=50) -> None:
         """Initialise a DC motor object.
         
         The MD10C motor driver gets 14.8V from the LiPo battery and outputs 12V to the DC motor.
@@ -16,7 +17,7 @@ class DCMotor:
         Args:
             PWM_pin (int): The GPIO pin number connected to the PWM input of the motor driver.
             DIR_pin (int): The GPIO pin number connected to the direction control input of the motor driver.
-            frequency (int, optional): The PWM frequency in Hertz. Defaults to 1000.
+            frequency (int, optional): The PWM frequency in Hertz. Defaults to 50.
         """
         self.PWM_pin = PWM_pin
         self.DIR_pin = DIR_pin
@@ -47,16 +48,23 @@ class DCMotor:
         self.current_direction = GPIO.LOW if self.current_direction == GPIO.HIGH else GPIO.HIGH
         GPIO.output(self.DIR_pin, self.current_direction)
 
-
 class Servo:
-    def __init__(self, PWM_pin: int, frequency=50) -> None:
+    def __init__(self, PWM_pin: int, frequency: int=50) -> None:
         self.PWM_pin = PWM_pin
-        self.angle = 0
+        self.frequency = frequency
+        self.pwm = self.calculate_pwm(0)
 
         GPIO.setup(self.PWM_pin, GPIO.OUT)
-        self.servo = GPIO.PWM(PWM_pin, frequency)
-        self.servo.start(60)
+        self.servo = GPIO.PWM(self.PWM_pin, self.frequency)
+        self.servo.start(self.pwm)
 
-    def rotate(self, angle: int) -> None:
-        difference = self.angle - angle
-        self.angle = angle
+    def calculate_pwm(self, angle: int) -> float:
+        return (7.0 / 90.0) * angle
+
+    def set_angle(self, angle: int) -> None:
+        pwm = self.calculate_pwm(angle)
+
+        if pwm != self.pwm:
+            print("running")
+            self.pwm = pwm
+            self.servo.ChangeDutyCycle(self.pwm)
