@@ -1,6 +1,8 @@
 import time
 import RPi.GPIO as GPIO
 
+# note: do we need to denoise using Kalmin filter?
+
 
 class UltrasonicSensor:
     def __init__(self, trigger: int, echo: int) -> None:

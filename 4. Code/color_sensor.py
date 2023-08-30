@@ -1,26 +1,9 @@
 from typing import Tuple
 import time
-import math
 
 import RPi.GPIO as GPIO
 
-from utils import pulseIn
-
-
-# Helper functions
-def euclidean_distance(color1, color2):
-    """Calculates the Euclidean distance between two colour vectors.
-
-    Args:
-        color1 (Tuple[int, int, int]): The first colour vector in RGB order.
-        color2 (Tuple[int, int, int]): The second colour vector in RGB order.
-
-    Returns:
-        float: The Euclidean distance between the two colour vectors.
-    """
-    
-    return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2)))
-
+from utils import pulseIn, euclidean_distance
 
 # Constants
 ORANGE_LINE = (255, 102, 0)
@@ -28,6 +11,8 @@ BLUE_LINE = (0, 51, 255)
 ORANGE_EUCLIDEAN = euclidean_distance(ORANGE_LINE, (0, 0, 0))
 BLUE_EUCLIDEAN = euclidean_distance(BLUE_LINE, (0, 0, 0))
 COLOR_TOLERANCE = 0.1
+
+# note: do we need to denoise using Kalmin filter?
 
 
 class ColorSensor:
