@@ -1,22 +1,24 @@
 from typing import List
 import time
-
 import RPi.GPIO as GPIO
 
 from ultrasonic_sensor import UltrasonicSensor
 from color_sensor import ColorSensor
 from motors import DCMotor, Servo
+from imu import IMU
+
 
 ULTRASONIC_SENSORS: List[UltrasonicSensor] = []
 COLOR_SENSORS: List[ColorSensor] = []
-
-motor = DCMotor(21, 20)
-servo = Servo(pin_id=26)
-
+MOTOR: DCMotor = None
+SERVO: Servo = None
+IMU_SENSOR: IMU = None
 
 def setup() -> None:
-    # Using Boardcom pin out reference standard
-    GPIO.setmode(GPIO.BCM)
+    global MOTOR, SERVO, IMU_SENSOR
+
+    # Using phyiscal board pin out reference
+    GPIO.setmode(GPIO.BOARD)
     GPIO.setwarnings(False)
 
     # We'll figure out the pins later on
@@ -24,52 +26,61 @@ def setup() -> None:
     ULTRASONIC_SENSORS.extend([
         UltrasonicSensor(25, 27),  # front
         UltrasonicSensor(23, 24),  # back
-        UltrasonicSensor(5, 6),   # right
-        UltrasonicSensor(13, 19)  # left
+        UltrasonicSensor(13, 19),  # left
+        UltrasonicSensor(5, 6)     # right
     ])
 
     COLOR_SENSORS.extend([
-        ColorSensor(14, 15, 18, 23, 24),
-        ColorSensor(23, 24, 25)
+        ColorSensor(14, 15, 18, 23, 24), # left
+        ColorSensor(23, 24, 25)          # right
     ])
 
+    # Pins here are done
+
+    MOTOR = DCMotor(32, 31)
+    SERVO = Servo(33)
+    IMU_SENSOR = IMU(5, 3, 0x68)
+    
 
 def main() -> None:
-    while True:
-        front_distance = ULTRASONIC_SENSORS[0].measure()
-        back_distance = ULTRASONIC_SENSORS[1].measure()
-        right_distance = ULTRASONIC_SENSORS[2].measure()
-        left_distance = ULTRASONIC_SENSORS[3].measure()
+    front_distance = ULTRASONIC_SENSORS[0].measure()
+    back_distance = ULTRASONIC_SENSORS[1].measure()
+    right_distance = ULTRASONIC_SENSORS[2].measure()
+    left_distance = ULTRASONIC_SENSORS[3].measure()
 
-        if (front_distance < 50 or back_distance < 50):
-            motor.start(0)
-            time.sleep(0.1)
+    if (front_distance < 50 or back_distance < 50):
+        MOTOR.start(0)
+        time.sleep(0.1)
 
-            motor.reverse()
-            motor.start(20)
+        MOTOR.reverse()
+        MOTOR.start(20)
 
-        else:
-            motor.forward()
-            motor.start(20)
+    else:
+        MOTOR.forward()
+        MOTOR.start(20)
 
-            if (left_distance < 150):
-                position = 30
-                servo.write(position)
+        if (left_distance < 150):
+            position = 30
+            SERVO.write(position)
 
-            elif (right_distance < 150):
-                position = 150
-                servo.write(position)
+        elif (right_distance < 150):
+            position = 150
+            SERVO.write(position)
 
-        for i, sensor in enumerate(COLOR_SENSORS):
-            color = sensor.determine_color()
+    for i, sensor in enumerate(COLOR_SENSORS):
+        color = sensor.determine_color()
 
-        time.sleep(1)
+    time.sleep(1)
 
 
 if __name__ == "__main__":
     try:
         print("Setting up")
         setup()
-        main()
+
+        # Run startup sequence: e.g. servo turning, move back etc. etc.
+
+        while True:
+            main()
     except KeyboardInterrupt:
         GPIO.cleanup()
