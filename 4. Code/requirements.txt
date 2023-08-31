@@ -8,4 +8,6 @@ numpy==1.25.2
 scipy==1.11.2
 filterpy==1.4.5
 
-# for computer vision, pip install opencv-python / apt-get 
+# for computer vision https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
+cv2==4.5.1
+picamera2==0.3.12
