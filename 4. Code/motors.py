@@ -79,9 +79,9 @@ class Servo:
     def set_angle(self, angle: int) -> None:
         pwm = self.calculate_pwm(angle)
 
-        # Acquire the lock to ensure thread safety
-        with self.lock:
-            if pwm != self.current_pwm:
+        if pwm != self.current_pwm:
+            # Acquire the lock to ensure thread safety
+            with self.lock:
                 # Rate limit the servo updates
                 current_time = time.time()
                 if current_time - self.last_update_time >= self.update_interval:
@@ -89,7 +89,8 @@ class Servo:
                     self.current_pwm = pwm
                     self.last_update_time = current_time
 
-    def get_position(self) -> float:
+    def get_angle(self) -> int:
         # Return the current position of the servo as an angle
         with self.lock:
-            return (self.current_pwm - self.min_pwm) / (self.max_pwm - self.min_pwm) * self.angle_range
+            result = (self.current_pwm - self.min_pwm) / (self.max_pwm - self.min_pwm) * self.angle_range
+            return int(result)

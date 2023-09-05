@@ -4,9 +4,8 @@ import RPi.GPIO as GPIO
 
 from ultrasonic_sensor import UltrasonicSensor
 from color_sensor import ColorSensor
-from motors import DCMotor, Servo
 from imu import IMU
-
+from motors import DCMotor, Servo
 
 ULTRASONIC_SENSORS: List[UltrasonicSensor] = []
 COLOR_SENSORS: List[ColorSensor] = []
@@ -40,9 +39,15 @@ def setup() -> None:
     MOTOR = DCMotor(32, 31)
     SERVO = Servo(33)
     IMU_SENSOR = IMU(5, 3, 0x68)
-    
+
 
 def main() -> None:
+    # Input -> process -> output
+    # inputs are ultasonic, colour sensor, imu, camera
+
+    for i, sensor in enumerate(COLOR_SENSORS):
+        color = sensor.determine_color()
+
     front_distance = ULTRASONIC_SENSORS[0].measure()
     back_distance = ULTRASONIC_SENSORS[1].measure()
     right_distance = ULTRASONIC_SENSORS[2].measure()
@@ -67,9 +72,6 @@ def main() -> None:
             position = 150
             SERVO.write(position)
 
-    for i, sensor in enumerate(COLOR_SENSORS):
-        color = sensor.determine_color()
-
     time.sleep(1)
 
 
@@ -78,9 +80,16 @@ if __name__ == "__main__":
         print("Setting up")
         setup()
 
+        time.sleep(1)
+
         # Run startup sequence: e.g. servo turning, move back etc. etc.
 
         while True:
             main()
     except KeyboardInterrupt:
+        print("Exiting. Cleaning up")
+        
+        SERVO.set_angle(0)
+        time.sleep(1)
+
         GPIO.cleanup()
