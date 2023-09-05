@@ -49,16 +49,12 @@ def read_frames(event):
 
 
 # Function to process and display frames
-def process_frames(event, **kwargs):
+def process_frames(event):
     while True:
         if event.is_set():
             break
 
         frame = frames_queue.get()
-        original = frame.copy()
-
-        cv.imshow("original",original)
-        height, width, channels = frame.shape
 
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         blurred = cv.GaussianBlur(gray, (5, 5), 0)
@@ -68,51 +64,8 @@ def process_frames(event, **kwargs):
         mask_red = cv.inRange(hsv, (HSV_RED - HSV_THRESHOLD)[0][0], (HSV_RED + HSV_THRESHOLD)[0][0])
         mask_green = cv.inRange(hsv, (HSV_GREEN - HSV_THRESHOLD)[0][0], (HSV_GREEN + HSV_THRESHOLD)[0][0])
 
-        # Combine the red and green masks to form one mask
-        mask = cv.bitwise_or(mask_green, mask_red)
-        mask = cv.erode(mask, None, iterations=2)
-        mask = cv.dilate(mask, None, iterations=2)
-        
-        # Bitwise-AND mask and original image
-        res = cv.bitwise_and(blurred, blurred, mask=mask)
-
-        # thresh = cv.threshold(res, 60, 255, cv.THRESH_BINARY)
-        # ret, thresh = cv.threshold(res, 60, 255, 0)
-        # thresh = cv.adaptiveThreshold(res, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
-
-        ret, thresh =  cv.threshold(res, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-        contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-
-        # draw boundary lines
-        boundary_left = int(width / BOUNDARY_THRSHOLD_RATIO)
-        boundary_right = width - boundary_left
-        boundary_positions = [boundary_left, boundary_right]
-        
-        for x in boundary_positions:
-            cv.line(frame, (x, 0), (x, height), (0, 255, 0), thickness=2)
-
-        # only proceed if at least one contour was found
-        if len(contours) > 0:
-            # find the largest contour in the mask and compute centroid and bounding box
-            c = max(contours, key=cv.contourArea)
-
-            M = cv.moments(c)
-            
-            if M["m00"] != 0: 
-                center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-                
-                x, y, w, h = cv.boundingRect(c)
-                cv.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 2)
-
-                box = np.int0(cv.boxPoints(cv.minAreaRect(c)))
-                cv.drawContours(frame, [box], 0, (0,0,255), 2)
-            
-                # draw the contour and center of the shape on the image
-                if "construction" in kwargs and kwargs["construction"]:
-                    cv.drawContours(frame, [c], -1, (0, 255, 0), 2)
-                    cv.circle(frame, center, 7, (255, 255, 255), -1)
-                
-                cv.line(frame, (center[0], 0), (center[0], height), (0, 255, 255), thickness=2)
+        analyse_maneuver(frame, blurred, mask_green, "GREEN")
+        analyse_maneuver(frame, blurred, mask_red, "RED")
 
         cv.imshow('Rendered result', frame)
         
@@ -122,6 +75,71 @@ def process_frames(event, **kwargs):
             event.set()
             break
 
+def analyse_maneuver(frame, image, mask, color, **kwargs):
+    height, width, channels = frame.shape
+
+    # Combine the red and green masks to form one mask
+    mask = cv.erode(mask, None, iterations=2)
+    mask = cv.dilate(mask, None, iterations=2)
+    
+    # Bitwise-AND mask and original image
+    res = cv.bitwise_and(image, image, mask=mask)
+
+    # thresh = cv.threshold(res, 60, 255, cv.THRESH_BINARY)
+    # ret, thresh = cv.threshold(res, 60, 255, 0)
+    # thresh = cv.adaptiveThreshold(res, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
+
+    ret, thresh =  cv.threshold(res, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    # Draw boundary lines
+    boundary_left = int(width / BOUNDARY_THRSHOLD_RATIO)
+    boundary_right = width - boundary_left
+    boundary_positions = [boundary_left, boundary_right]
+    
+    for x in boundary_positions:
+        cv.line(frame, (x, 0), (x, height), (0, 255, 0), thickness=2)
+
+    # Only proceed if at least one contour was found
+    if len(contours) > 0:
+        # Find the largest contour in the mask and compute centroid and bounding box
+        c = max(contours, key=cv.contourArea)
+        
+        # area = cv.contourArea(c)
+        # if area < 100: # Arbitrary value of 100. To adjust when testing 
+        #     continue
+
+        M = cv.moments(c)
+
+        if M["m00"] != 0: 
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            
+            x, y, w, h = cv.boundingRect(c)
+            cv.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 2)
+
+            box = np.int0(cv.boxPoints(cv.minAreaRect(c)))
+            cv.drawContours(frame, [box], 0, (0,0,255), 2)
+        
+            # draw the contour and center of the shape on the image
+            if "construction" in kwargs and kwargs["construction"]:
+                cv.drawContours(frame, [c], -1, (0, 255, 0), 2)
+                cv.circle(frame, center, 7, (255, 255, 255), -1)
+            
+            cv.line(frame, (center[0], 0), (center[0], height), (0, 255, 255), thickness=2)
+
+            # performing maneuver analysis
+
+            if color.upper() == "GREEN":
+                if center[0] <= boundary_right:
+                    # Green object is on the left side, perform left maneuver
+                    print("Perform left maneuver (green)")
+
+            if color.upper() == "RED":
+                if center[0] >= boundary_left:
+                    # Red object is on the right, perform right maneuver
+                    print("Perform right maneuver (red)")
+
+            print("END OF FUNCTION")
 
 event = Event()
 
