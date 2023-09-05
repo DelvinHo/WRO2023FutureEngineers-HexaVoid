@@ -20,8 +20,11 @@ Steps in the computer vision file
 # The colour of the green traffic signs is RGB (68, 214, 44).
 
 KERNEL = np.ones((5,5),np.float32) / 25
-HSV_RED = cv.cvtColor(np.uint8([[[55, 39, 238]]]), cv.COLOR_BGR2HSV)
-HSV_GREEN = cv.cvtColor(np.uint8([[[44, 214, 68]]]), cv.COLOR_BGR2HSV)
+# HSV_RED = cv.cvtColor(np.uint8([[[55, 39, 238]]]), cv.COLOR_BGR2HSV)
+# HSV_GREEN = cv.cvtColor(np.uint8([[[44, 214, 68]]]), cv.COLOR_BGR2HSV)
+HSV_RED = cv.cvtColor(np.uint8([[[75, 28, 171]]]), cv.COLOR_BGR2HSV)
+HSV_GREEN = cv.cvtColor(np.uint8([[[90, 210, 27]]]), cv.COLOR_BGR2HSV)
+
 HSV_THRESHOLD = 30
 BOUNDARY_THRSHOLD_RATIO = 4
 
@@ -52,16 +55,23 @@ def process_frames(event, **kwargs):
             break
 
         frame = frames_queue.get()
+        original = frame.copy()
+
+        cv.imshow("original",original)
         height, width, channels = frame.shape
 
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        blurred = cv.GaussianBlur(gray, (5, 5), 0) # Might remove
+        blurred = cv.GaussianBlur(gray, (5, 5), 0)
 
-        # Threshold the HSV image to get only green colors
+        # Threshold the HSV image to get either red or green
         hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
-        mask = cv.inRange(hsv, (HSV_GREEN - HSV_THRESHOLD)[0][0], (HSV_GREEN + HSV_THRESHOLD)[0][0])
-        mask = cv.erode(mask, None, iterations=2) # Might remove
-        mask = cv.dilate(mask, None, iterations=2) # Might remove
+        mask_red = cv.inRange(hsv, (HSV_RED - HSV_THRESHOLD)[0][0], (HSV_RED + HSV_THRESHOLD)[0][0])
+        mask_green = cv.inRange(hsv, (HSV_GREEN - HSV_THRESHOLD)[0][0], (HSV_GREEN + HSV_THRESHOLD)[0][0])
+
+        # Combine the red and green masks to form one mask
+        mask = cv.bitwise_or(mask_green, mask_red)
+        mask = cv.erode(mask, None, iterations=2)
+        mask = cv.dilate(mask, None, iterations=2)
         
         # Bitwise-AND mask and original image
         res = cv.bitwise_and(blurred, blurred, mask=mask)
