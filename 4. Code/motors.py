@@ -1,4 +1,6 @@
 import RPi.GPIO as GPIO
+import threading
+import time
 
 
 class DCMotor:
@@ -47,23 +49,47 @@ class DCMotor:
         self.current_direction = GPIO.LOW if self.current_direction == GPIO.HIGH else GPIO.HIGH
         GPIO.output(self.DIR_pin, self.current_direction)
 
+
 class Servo:
-    def __init__(self, PWM_pin: int, frequency: int=50) -> None:
+    def __init__(self, PWM_pin: int, frequency: int = 50, min_pwm: float = 1, max_pwm: float = 13) -> None:
         self.PWM_pin = PWM_pin
         self.frequency = frequency
-        self.pwm = self.calculate_pwm(0)
+        self.min_pwm = min_pwm
+        self.max_pwm = max_pwm
+        self.angle_range = 180.0  # Assuming a standard servo with 180 degrees of motion
 
         GPIO.setup(self.PWM_pin, GPIO.OUT)
         self.servo = GPIO.PWM(self.PWM_pin, self.frequency)
-        self.servo.start(self.pwm)
+        self.servo.start(self.min_pwm)  # Start with the servo at its minimum position
+        self.current_pwm = self.min_pwm  # Track the current PWM value
+
+        # Create a lock to ensure thread safety when changing PWM
+        self.lock = threading.Lock()
+
+        # Rate limiting variables
+        self.last_update_time = time.time()
+        self.update_interval = 0.1  # Adjust this value as needed for your application
 
     def calculate_pwm(self, angle: int) -> float:
-        return (7.0 / 90.0) * angle
+        # Calculate the PWM value based on the specified angle and range
+        pwm_range = self.max_pwm - self.min_pwm
+        pwm_value = (angle / self.angle_range) * pwm_range + self.min_pwm
+        return pwm_value
 
     def set_angle(self, angle: int) -> None:
         pwm = self.calculate_pwm(angle)
 
-        if pwm != self.pwm:
-            print("running")
-            self.pwm = pwm
-            self.servo.ChangeDutyCycle(self.pwm)
+        # Acquire the lock to ensure thread safety
+        with self.lock:
+            if pwm != self.current_pwm:
+                # Rate limit the servo updates
+                current_time = time.time()
+                if current_time - self.last_update_time >= self.update_interval:
+                    self.servo.ChangeDutyCycle(pwm)
+                    self.current_pwm = pwm
+                    self.last_update_time = current_time
+
+    def get_position(self) -> float:
+        # Return the current position of the servo as an angle
+        with self.lock:
+            return (self.current_pwm - self.min_pwm) / (self.max_pwm - self.min_pwm) * self.angle_range
