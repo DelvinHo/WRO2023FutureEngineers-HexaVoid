@@ -12,8 +12,8 @@ Steps in the computer vision file
 4. Optimise object mask by eroding and dilating
 5. Pick the largest contour, if any
 6. Get the image moment of the picked contour
-7. Draw the contour and its center, along with its y-axis
-8. 
+7. Draw the contour and its center and bounding box, along with its y-axis
+8. Determine 
 """
 
 # The colour of the red traffic signs is RGB (238, 39, 55).
@@ -23,6 +23,7 @@ KERNEL = np.ones((5,5),np.float32) / 25
 HSV_RED = cv.cvtColor(np.uint8([[[55, 39, 238]]]), cv.COLOR_BGR2HSV)
 HSV_GREEN = cv.cvtColor(np.uint8([[[44, 214, 68]]]), cv.COLOR_BGR2HSV)
 HSV_THRESHOLD = 30
+BOUNDARY_THRSHOLD_RATIO = 4
 
 # Initialize the camera
 camera = Picamera2()
@@ -45,74 +46,65 @@ def read_frames(event):
 
 
 # Function to process and display frames
-def process_frames(event):
+def process_frames(event, **kwargs):
     while True:
         if event.is_set():
             break
 
         frame = frames_queue.get()
+        height, width, channels = frame.shape
+
         gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-        blurred = cv.GaussianBlur(gray, (5, 5), 0)
+        blurred = cv.GaussianBlur(gray, (5, 5), 0) # Might remove
 
         # Threshold the HSV image to get only green colors
         hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
         mask = cv.inRange(hsv, (HSV_GREEN - HSV_THRESHOLD)[0][0], (HSV_GREEN + HSV_THRESHOLD)[0][0])
-        mask = cv.erode(mask, None, iterations=2)
-        mask = cv.dilate(mask, None, iterations=2)
+        mask = cv.erode(mask, None, iterations=2) # Might remove
+        mask = cv.dilate(mask, None, iterations=2) # Might remove
         
         # Bitwise-AND mask and original image
         res = cv.bitwise_and(blurred, blurred, mask=mask)
 
         # thresh = cv.threshold(res, 60, 255, cv.THRESH_BINARY)
-        # cnts = cv.findContours(thresh, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-        # image = cv.drawContours(res, cnts, -1, (0,255,0), 3)
-
         # ret, thresh = cv.threshold(res, 60, 255, 0)
         # thresh = cv.adaptiveThreshold(res, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2)
 
         ret, thresh =  cv.threshold(res, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
         contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
+        # draw boundary lines
+        boundary_left = int(width / BOUNDARY_THRSHOLD_RATIO)
+        boundary_right = width - boundary_left
+        boundary_positions = [boundary_left, boundary_right]
+        
+        for x in boundary_positions:
+            cv.line(frame, (x, 0), (x, height), (0, 255, 0), thickness=2)
+
         # only proceed if at least one contour was found
         if len(contours) > 0:
-            # find the largest contour in the mask, then use
-            # it to compute the minimum enclosing circle and
-            # centroid
+            # find the largest contour in the mask and compute centroid and bounding box
             c = max(contours, key=cv.contourArea)
-            # ((x, y), radius) = cv.minEnclosingCircle(c)
-            # compute the center of the contour
+
             M = cv.moments(c)
             
             if M["m00"] != 0: 
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+                
+                x, y, w, h = cv.boundingRect(c)
+                cv.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 2)
+
+                box = np.int0(cv.boxPoints(cv.minAreaRect(c)))
+                cv.drawContours(frame, [box], 0, (0,0,255), 2)
             
                 # draw the contour and center of the shape on the image
-                cv.drawContours(res, [c], -1, (0, 255, 0), 2)
-                cv.circle(res, center, 7, (255, 0, 0), -1)
+                if "construction" in kwargs and kwargs["construction"]:
+                    cv.drawContours(frame, [c], -1, (0, 255, 0), 2)
+                    cv.circle(frame, center, 7, (255, 255, 255), -1)
+                
+                cv.line(frame, (center[0], 0), (center[0], height), (0, 255, 255), thickness=2)
 
-        # height, width = res.shape
-        # min_x, min_y = width, height
-        # max_x = max_y = 0
-
-        # # computes the bounding box for the contour, and draws it on the frame,
-        # for contour in contours:
-        #     global output
-        #     (x, y, w, h) = cv.boundingRect(contour)
-        #     min_x, max_x = min(x, min_x), max(x + w, max_x)
-        #     min_y, max_y = min(y, min_y), max(y + h, max_y)
-
-        #     if w > 80 and h > 80:
-        #         output = cv.rectangle(res, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-        # if max_x - min_x > 0 and max_y - min_y > 0:
-        #     output = cv.rectangle(res, (min_x, min_y), (max_x, max_y), (255, 0, 0), 2)
-
-
-        # # output = cv.drawContours(res, contours, -1, (255, 0, 0), 3)
-
-        # cv.imshow('Contours', output)
-        cv.imshow('Masked green', res)
-        cv.imshow('Original', blurred)
+        cv.imshow('Rendered result', frame)
         
         # if the 'q' key is pressed, stop the loop
         key = cv.waitKey(1) & 0xFF
@@ -137,4 +129,4 @@ process_thread.join()
 camera.close()
 
 print("Stopping")
-cv.destoryAllWindows()
+cv.destroyAllWindows()
