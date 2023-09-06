@@ -7,6 +7,7 @@ from color_sensor import ColorSensor
 from imu import IMU
 from motors import DCMotor, Servo
 
+SWITCH = None
 ULTRASONIC_SENSORS: List[UltrasonicSensor] = []
 COLOR_SENSORS: List[ColorSensor] = []
 MOTOR: DCMotor = None
@@ -36,6 +37,7 @@ def setup() -> None:
 
     # Pins here are done
 
+    SWITCH = GPIO.setup(39, GPIO.IN)
     MOTOR = DCMotor(32, 31)
     SERVO = Servo(33)
     IMU_SENSOR = IMU(5, 3, 0x68)
@@ -54,11 +56,11 @@ def main() -> None:
     left_distance = ULTRASONIC_SENSORS[3].measure()
 
     if (front_distance < 50 or back_distance < 50):
-        MOTOR.start(0)
+        MOTOR.set_pwm(0)
         time.sleep(0.1)
 
         MOTOR.reverse()
-        MOTOR.start(20)
+        MOTOR.set_pwm(20)
 
     else:
         MOTOR.forward()
@@ -85,7 +87,8 @@ if __name__ == "__main__":
         # Run startup sequence: e.g. servo turning, move back etc. etc.
 
         while True:
-            main()
+            if SWITCH == GPIO.HIGH:
+                main()
     except KeyboardInterrupt:
         print("Exiting. Cleaning up")
         

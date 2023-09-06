@@ -1,6 +1,8 @@
-import RPi.GPIO as GPIO
 import threading
 import time
+import math
+
+import RPi.GPIO as GPIO
 
 
 class DCMotor:
@@ -23,19 +25,36 @@ class DCMotor:
         self.PWM_pin = PWM_pin
         self.DIR_pin = DIR_pin
         self.frequency = frequency
+        self.PWM = 20
+
+        # DC motor properties
+        self.Rated_Load_RPM = 300
+        self.Radius = 43.03
 
         self.current_direction = GPIO.HIGH
         GPIO.setup(self.DIR_pin, GPIO.OUT)
 
         GPIO.setup(self.PWM_pin, GPIO.OUT)
         self.motor = GPIO.PWM(PWM_pin, frequency)
-        self.motor.start(20)
+        self.motor.start(self.PWM)
 
     def __getattr__(self, attr):
         # Delegate unknown attributes to GPIO.PWM object
         # e.g. start and stop, ChangeFrequency methods
         # in https://sourceforge.net/p/raspberry-gpio-python/wiki/PWM/
         return getattr(self.motor, attr)
+
+    def estimate_speed(self) -> float:
+        rpm = self.Rated_Load_RPM * self.PWM
+        cir = 2 * math.pi * self.Radius
+        speed_cm_s = (rpm / 60) * cir
+
+        return speed_cm_s
+
+    def set_pwm(self, PWM: int):
+        if PWM != self.PWM:
+            self.PWM = PWM
+            self.motor.ChangeDutyCycle(PWM)
 
     def forward(self) -> None:
         self.current_direction = GPIO.HIGH
